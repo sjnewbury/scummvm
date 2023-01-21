@@ -1,4 +1,4 @@
-ROOT_PATH := .
+ROOT_PATH := $(patsubst %/,%,$(dir $(abspath $(lastword $(MAKEFILE_LIST)))))
 
 # Output files prefix
 TARGET_NAME = scummvm
@@ -608,7 +608,7 @@ libdetect.a: $(DETECT_OBJS)
 
 clean:
 	@echo Cleaning project...
-	$(HIDE)$(RM_REC) $(DEPDIRS)
+	$(HIDE)$(RM_REC) $(DEPDIRS) $(DEPS_PATH)
 	$(HIDE)$(RM) $(OBJS) $(DETECT_OBJS) $(OBJS_DEPS) libdeps.a libdetect.a $(TARGET) *.a
 	$(HIDE)$(RM_REC) libtemp $(MODULES)
 	$(HIDE)$(RM) libnx-ln
