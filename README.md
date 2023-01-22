@@ -42,10 +42,15 @@ Note that both datafiles and themes included in `scummvm.zip` need to be consist
 
 ## Core options and configuration
 All options and configuration of the legacy libretro core are applicable to this one as well, refer to relevant link in Resources.
+Some additional options and features have been added to this core:
 
-Some additional options have been added to this core:
-* On-screen virtual keyboard (retropad "select" button by default to activate/deactivate)
+### New options
 * Set D-pad cursor acceleration time
+
+### New features
+* On-screen virtual keyboard (retropad "select" button by default to activate/deactivate)<br>Resources from `scummvm.zip` are needed to be installed for this feature to be enabled.
+
+* Cloud saving<br>This feature is currently disabled by default (e.g. on buildbot) as it has shared dependencies (libcurl-openssl).<br>To enable the feature, compile passing `USE_CLOUD=1` to make. `libcurl` package with `openssl` must be installed on host system as described [here](https://wiki.scummvm.org/index.php/Compiling_ScummVM).<br>Note that by default the entire retroarch `saves` folder will be syncronized, which may be a plus considering that this feature is currently not available in retroarch.
 
 ## Resources
 Official ScummVM repository readme is [here](https://github.com/scummvm/scummvm#readme).
