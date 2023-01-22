@@ -15,7 +15,7 @@ git clone --recursive https://github.com/libretro/scummvm
 cd scummvm
 make
 ```
-Use `make all` to build the core along with datafiles/themes (`scummvm.zip`) and core info file (which can be built separately with `make datafiles`/`make infofile`).
+Use `make all` to build the core along with datafiles/themes (`scummvm.zip`) and core info file (which can be built separately with `make datafiles`/`make coreinfo`).
 
 "Work in progress" engines are not built by default, to include them pass `NO_WIP=0` to make.
 
