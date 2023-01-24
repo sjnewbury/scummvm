@@ -6,7 +6,6 @@
 #include "common/scummsys.h"
 #include "os.h"
 #include "surface.libretro.h"
-#include <libco.h>
 #ifdef _WIN32
 #include <direct.h>
 #else
@@ -29,7 +28,7 @@
 #include "base/internal_version.h"
 
 #include "libretro_core_options.h"
-#include "retro_emu_thread.h"
+#include "libretro-threads.h"
 
 retro_log_printf_t log_cb = NULL;
 static retro_video_refresh_t video_cb = NULL;
@@ -70,37 +69,6 @@ void retro_set_environment(retro_environment_t cb) {
   environ_cb(RETRO_ENVIRONMENT_SET_SUPPORT_NO_GAME, &tmp);
   libretro_set_core_options(environ_cb);
 }
-
-#if defined(USE_LIBCO)
-bool FRONTENDwantsExit;
-bool EMULATORexited;
-
-cothread_t mainThread;
-cothread_t emuThread;
-
-void retro_leave_thread(void) { co_switch(mainThread); }
-
-static void retro_wrap_emulator(void) {
-  g_system = retroBuildOS(speed_hack_is_enabled);
-
-  static const char *argv[20];
-  for (int i = 0; i < cmd_params_num; i++)
-    argv[i] = cmd_params[i];
-
-  scummvm_main(cmd_params_num, argv);
-  EMULATORexited = true;
-
-  // NOTE: Deleting g_system here will crash...
-
-  /* Were done here, shutdown on the main thread */
-  while (true) {
-    co_switch(mainThread);
-    /* Dead emulator, but libco says not to return */
-    if (log_cb)
-      log_cb(RETRO_LOG_ERROR, "Running a dead emulator.\n");
-  }
-}
-#endif
 
 unsigned retro_api_version(void) { return RETRO_API_VERSION; }
 
@@ -374,59 +342,44 @@ bool retro_load_game(const struct retro_game_info *game) {
     retroSetSaveDir(".");
   }
 
-#if defined(USE_LIBCO)
-  if (!emuThread && !mainThread) {
-    mainThread = co_active();
-    emuThread = co_create(65536 * sizeof(void *), retro_wrap_emulator);
-  }
-#else
-  g_system = retroBuildOS(speed_hack_is_enabled);
-  if (!g_system) {
-    if (log_cb)
-      log_cb(RETRO_LOG_ERROR, "[scummvm] Failed to initialize platform driver.\n");
-    return false;
-  }
-  if (!retro_init_emu_thread())
-    if (log_cb)
-      log_cb(RETRO_LOG_ERROR, "[scummvm] Failed to initialize emulation thread!\n");
-#endif
 
+g_system = retroBuildOS(speed_hack_is_enabled);
+
+if (!g_system) {
+  if (log_cb)
+    log_cb(RETRO_LOG_ERROR, "[scummvm] Failed to initialize platform driver.\n");
+  return false;
+}
+
+if (!retro_init_emu_thread()){
+  if (log_cb)
+    log_cb(RETRO_LOG_ERROR, "[scummvm] Failed to initialize emulation thread!\n");
+  return false;
+}
   return true;
 }
 
 bool retro_load_game_special(unsigned game_type, const struct retro_game_info *info, size_t num_info) { return false; }
 
 void retro_run(void) {
-#if defined(USE_LIBCO)
-  if (!emuThread) {
+  if (retro_emu_thread_exited())
+    retro_deinit_emu_thread();
+
+  if (!retro_emu_thread_initialized()) {
     environ_cb(RETRO_ENVIRONMENT_SHUTDOWN, NULL);
     return;
   }
-#else
-  if (!retro_is_emu_thread_initialized() || retro_emu_thread_exited()) {
-    environ_cb(RETRO_ENVIRONMENT_SHUTDOWN, NULL);
-    return;
-  }
-#endif
 
   bool updated = false;
   if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE_UPDATE, &updated) && updated)
     update_variables();
 
+  retro_switch_to_emu_thread();
   /* Mouse */
   if (g_system) {
     poll_cb();
     retroProcessMouse(input_cb, retro_device, gampad_cursor_speed, gamepad_acceleration_time, analog_response_is_quadratic, analog_deadzone, mouse_speed);
-  }
 
-  /* Run emu */
-#if defined(USE_LIBCO)
-  co_switch(emuThread);
-#else
-  retro_switch_thread();
-#endif
-
-  if (g_system) {
     /* Upload video: TODO: Check the CANDUPE env value */
     const Graphics::Surface &screen = getScreen();
 
@@ -449,40 +402,18 @@ void retro_run(void) {
 #endif
       audio_batch_cb((int16_t *)buf, count);
   }
-
-#if defined(USE_LIBCO)
-  if (EMULATORexited) {
-    co_delete(emuThread);
-    emuThread = 0;
-  }
-#endif
 }
 
 void retro_unload_game(void) {
-#if defined(USE_LIBCO)
-  if (!emuThread)
+  if (!retro_emu_thread_initialized())
     return;
-
-  FRONTENDwantsExit = true;
-  while (!EMULATORexited) {
-    retroPostQuit();
-    co_switch(emuThread);
-  }
-
-  co_delete(emuThread);
-  emuThread = 0;
-#else
-  if (!retro_is_emu_thread_initialized())
-    return;
-
   while (!retro_emu_thread_exited()) {
     retroPostQuit();
-    retro_switch_thread();
+    retro_switch_to_emu_thread();
   }
+  // g_system->destroy(); //TODO: This call causes "pure virtual method called" after frontend "Unloading core symbols". Check if needed at all.
 
-  retro_join_emu_thread();
   retro_deinit_emu_thread();
-#endif
 }
 
 // Stubs
@@ -527,3 +458,4 @@ int access(const char *path, int amode) {
   return -1;
 }
 #endif
+

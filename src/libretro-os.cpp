@@ -64,7 +64,7 @@
 
 #include "libretro.h"
 #include "features/features_cpu.h"
-#include "retro_emu_thread.h"
+#include "libretro-threads.h"
 
 extern retro_log_printf_t log_cb;
 
@@ -562,12 +562,7 @@ public:
 
   void retroCheckThread(uint32 offset = 0) {
     if (_threadExitTime <= (getMillis() + offset)) {
-#if defined(USE_LIBCO)
-      extern void retro_leave_thread();
-      retro_leave_thread();
-#else
-      retro_switch_thread();
-#endif
+      retro_switch_to_main_thread();
       _threadExitTime = getMillis() + 10;
     }
   }
