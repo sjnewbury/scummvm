@@ -4,6 +4,7 @@
 #include "audio/mixer_intern.h"
 #include "base/main.h"
 #include "common/scummsys.h"
+#include "streams/file_stream.h"
 #include "os.h"
 #include "surface.libretro.h"
 #ifdef _WIN32
@@ -316,7 +317,7 @@ bool retro_load_game(const struct retro_game_info *game) {
     // Retrieve the game path.
     char *path = strdup(game->path);
     char *gamedir = dirname(path);
-    char buffer[390];
+    char buffer[400];
     int test_game_status = TEST_GAME_KO_NOT_FOUND;
 
     struct retro_message_ext retro_msg;
@@ -325,30 +326,27 @@ bool retro_load_game(const struct retro_game_info *game) {
     retro_msg.duration = 3000;
     retro_msg.msg = "";
 
-    char filedata[390] = {0};
+    char filedata[400] = {0};
     // See if we are loading a .scummvm file.
     if (strstr(game->path, ".scummvm") != NULL) {
       // Open the file.
-      FILE *gamefile = fopen(game->path, "r");
-      if (gamefile == NULL) {
+      RFILE *gamefile = filestream_open(game->path, RETRO_VFS_FILE_ACCESS_READ, RETRO_VFS_FILE_ACCESS_HINT_NONE);
+      if (!gamefile) {
         log_cb(RETRO_LOG_ERROR, "[scummvm] Failed to load given game file.\n");
-        free(path);
         return false;
       }
 
       // Load the file data.
-      char filedata[400];
-      if (fgets(filedata, 400, gamefile) == NULL) {
-        fclose(gamefile);
+      if (filestream_gets(gamefile, filedata, sizeof(filedata)) == NULL) {
+        filestream_close(gamefile);
         log_cb(RETRO_LOG_ERROR, "[scummvm] Failed to load contents of game file.\n");
-        free(path);
         return false;
       }
 
       test_game_status = retroTestGame(filedata, false);
 
       // Create a command line parameters using -p and the game name.
-      fclose(gamefile);
+      filestream_close(gamefile);
     } else {
       // Use auto-detect to launch the game from the given directory.
       test_game_status = retroTestGame(gamedir, true);
@@ -378,8 +376,6 @@ bool retro_load_game(const struct retro_game_info *game) {
     }else{
       parse_command_params(buffer);
     }
-
-    free(path);
   }
 
   if (!retro_init_emu_thread()) {
@@ -463,28 +459,28 @@ unsigned retro_get_region(void) { return RETRO_REGION_NTSC; }
 
 #if (defined(GEKKO) && !defined(WIIU)) || defined(__CELLOS_LV2__)
 int access(const char *path, int amode) {
-  FILE *f;
-  const char *mode;
+  RFILE *f;
+  int mode;
 
   switch (amode) {
   // we don't really care if a file exists but isn't readable
   case F_OK:
   case R_OK:
-    mode = "r";
+    mode = RETRO_VFS_FILE_ACCESS_READ;
     break;
 
   case W_OK:
-    mode = "r+";
+    mode = RETRO_VFS_FILE_ACCESS_UPDATE_EXISTING;
     break;
 
   default:
     return -1;
   }
 
-  f = fopen(path, mode);
+  f = filestream_open(path, RETRO_VFS_FILE_ACCESS_READ, RETRO_VFS_FILE_ACCESS_HINT_NONE);
 
   if (f) {
-    fclose(f);
+    filestream_close(f);
     return 0;
   }
 
