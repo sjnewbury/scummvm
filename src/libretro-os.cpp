@@ -1130,6 +1130,13 @@ public:
     ev.type = Common::EVENT_QUIT;
     dynamic_cast<OSystem_RETRO *>(g_system)->getEventManager()->pushEvent(ev);
   }
+
+  void Reset(){
+    Common::Event ev;
+    ev.type = Common::EVENT_RETURN_TO_LAUNCHER;
+    dynamic_cast<OSystem_RETRO *>(g_system)->getEventManager()->pushEvent(ev);
+  }
+
 };
 
 OSystem *retroBuildOS(bool aEnableSpeedHack) { return new OSystem_RETRO(aEnableSpeedHack); }
@@ -1145,3 +1152,5 @@ void retroSetSystemDir(const char *aPath) { s_systemDir = Common::String(aPath ?
 void retroSetSaveDir(const char *aPath) { s_saveDir = Common::String(aPath ? aPath : "."); }
 
 void retroKeyEvent(bool down, unsigned keycode, uint32_t character, uint16_t key_modifiers) { dynamic_cast<OSystem_RETRO *>(g_system)->processKeyEvent(down, keycode, character, key_modifiers); }
+
+void retroReset() { dynamic_cast<OSystem_RETRO *>(g_system)->Reset(); }

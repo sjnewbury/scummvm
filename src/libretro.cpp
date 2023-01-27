@@ -411,15 +411,17 @@ void retro_unload_game(void) {
     retroPostQuit();
     retro_switch_to_emu_thread();
   }
-  // g_system->destroy(); //TODO: This call causes "pure virtual method called" after frontend "Unloading core symbols". Check if needed at all.
-
   retro_deinit_emu_thread();
+  // g_system->destroy(); //TODO: This call causes "pure virtual method called" after frontend "Unloading core symbols". Check if needed at all.
+}
+
+void retro_reset(void) {
+  retroReset();
 }
 
 // Stubs
 void *retro_get_memory_data(unsigned type) { return 0; }
 size_t retro_get_memory_size(unsigned type) { return 0; }
-void retro_reset(void) {}
 size_t retro_serialize_size(void) { return 0; }
 bool retro_serialize(void *data, size_t size) { return false; }
 bool retro_unserialize(const void *data, size_t size) { return false; }
