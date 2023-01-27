@@ -27,8 +27,8 @@
 #define INCLUDED_FROM_BASE_VERSION_CPP
 #include "base/internal_version.h"
 
-#include "libretro_core_options.h"
 #include "libretro-threads.h"
+#include "libretro_core_options.h"
 
 retro_log_printf_t log_cb = NULL;
 static retro_video_refresh_t video_cb = NULL;
@@ -235,48 +235,10 @@ bool retro_load_game(const struct retro_game_info *game) {
   const char *sysdir;
   const char *savedir;
 
-  cmd_params_num = 1;
-  strcpy(cmd_params[0], "scummvm\0");
-
   update_variables();
 
-  if (game) {
-    // Retrieve the game path.
-    char *path = strdup(game->path);
-    char *gamedir = dirname(path);
-    char buffer[400];
-
-    // See if we are loading a .scummvm file.
-    if (strstr(game->path, ".scummvm") != NULL) {
-      // Open the file.
-      FILE *gamefile = fopen(game->path, "r");
-      if (gamefile == NULL) {
-        log_cb(RETRO_LOG_ERROR, "[scummvm] Failed to load given game file.\n");
-        free(path);
-        return false;
-      }
-
-      // Load the file data.
-      char filedata[400];
-      if (fgets(filedata, 400, gamefile) == NULL) {
-        fclose(gamefile);
-        log_cb(RETRO_LOG_ERROR, "[scummvm] Failed to load contents of game file.\n");
-        free(path);
-        return false;
-      }
-
-      // Create a command line parameters using -p and the game name.
-      sprintf(buffer, "-p \"%s\" %s", gamedir, filedata);
-      fclose(gamefile);
-      parse_command_params(buffer);
-    } else {
-      // Use auto-detect to launch the game from the given directory.
-      sprintf(buffer, "-p \"%s\" --auto-detect", gamedir);
-      parse_command_params(buffer);
-    }
-
-    free(path);
-  }
+  cmd_params_num = 1;
+  strcpy(cmd_params[0], "scummvm\0");
 
   struct retro_input_descriptor desc[] = {
       {0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_LEFT, "Mouse Cursor Left"},
@@ -342,20 +304,89 @@ bool retro_load_game(const struct retro_game_info *game) {
     retroSetSaveDir(".");
   }
 
+  g_system = retroBuildOS(speed_hack_is_enabled);
 
-g_system = retroBuildOS(speed_hack_is_enabled);
+  if (!g_system) {
+    if (log_cb)
+      log_cb(RETRO_LOG_ERROR, "[scummvm] Failed to initialize platform driver.\n");
+    return false;
+  }
 
-if (!g_system) {
-  if (log_cb)
-    log_cb(RETRO_LOG_ERROR, "[scummvm] Failed to initialize platform driver.\n");
-  return false;
-}
+  if (game) {
+    // Retrieve the game path.
+    char *path = strdup(game->path);
+    char *gamedir = dirname(path);
+    char buffer[390];
+    int test_game_status = TEST_GAME_KO_NOT_FOUND;
 
-if (!retro_init_emu_thread()){
-  if (log_cb)
-    log_cb(RETRO_LOG_ERROR, "[scummvm] Failed to initialize emulation thread!\n");
-  return false;
-}
+    struct retro_message_ext retro_msg;
+    retro_msg.type = RETRO_MESSAGE_TYPE_NOTIFICATION;
+    retro_msg.target = RETRO_MESSAGE_TARGET_OSD;
+    retro_msg.duration = 3000;
+    retro_msg.msg = "";
+
+    char filedata[390] = {0};
+    // See if we are loading a .scummvm file.
+    if (strstr(game->path, ".scummvm") != NULL) {
+      // Open the file.
+      FILE *gamefile = fopen(game->path, "r");
+      if (gamefile == NULL) {
+        log_cb(RETRO_LOG_ERROR, "[scummvm] Failed to load given game file.\n");
+        free(path);
+        return false;
+      }
+
+      // Load the file data.
+      char filedata[400];
+      if (fgets(filedata, 400, gamefile) == NULL) {
+        fclose(gamefile);
+        log_cb(RETRO_LOG_ERROR, "[scummvm] Failed to load contents of game file.\n");
+        free(path);
+        return false;
+      }
+
+      test_game_status = retroTestGame(filedata, false);
+
+      // Create a command line parameters using -p and the game name.
+      fclose(gamefile);
+    } else {
+      // Use auto-detect to launch the game from the given directory.
+      test_game_status = retroTestGame(gamedir, true);
+    }
+
+    // Preliminary game scan results
+    switch (test_game_status) {
+    case TEST_GAME_OK_ID_FOUND:
+      sprintf(buffer, "-p \"%s\" %s", gamedir, filedata);
+      break;
+    case TEST_GAME_OK_TARGET_FOUND:
+      sprintf(buffer, "%s", filedata);
+      break;
+    case TEST_GAME_OK_ID_AUTODETECTED:
+      sprintf(buffer, "-p \"%s\" --auto-detect", gamedir);
+      break;
+    case TEST_GAME_KO_MULTIPLE_RESULTS:
+      retro_msg.msg = "Multiple targets found";
+      break;
+    case TEST_GAME_KO_NOT_FOUND:
+    default:
+      retro_msg.msg = "Game not found";
+    }
+
+    if (retro_msg.msg[0] != '\0') {
+      environ_cb(RETRO_ENVIRONMENT_SET_MESSAGE_EXT, &retro_msg);
+    }else{
+      parse_command_params(buffer);
+    }
+
+    free(path);
+  }
+
+  if (!retro_init_emu_thread()) {
+    if (log_cb)
+      log_cb(RETRO_LOG_ERROR, "[scummvm] Failed to initialize emulation thread!\n");
+    return false;
+  }
   return true;
 }
 

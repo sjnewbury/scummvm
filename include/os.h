@@ -23,6 +23,13 @@
 #ifndef BACKENDS_LIBRETRO_OS_H
 #define BACKENDS_LIBRETRO_OS_H
 
+// Preliminary scan results
+#define TEST_GAME_OK_TARGET_FOUND        0
+#define TEST_GAME_OK_ID_FOUND            1
+#define TEST_GAME_OK_ID_AUTODETECTED     2
+#define TEST_GAME_KO_NOT_FOUND           3
+#define TEST_GAME_KO_MULTIPLE_RESULTS    4
+
 #define FORBIDDEN_SYMBOL_ALLOW_ALL
 #include "libretro.h"
 
@@ -55,6 +62,7 @@ const Graphics::Surface &getScreen();
 void retroProcessMouse(retro_input_state_t aCallback, int device, float gamepad_cursor_speed, float gamepad_acceleration_time, bool analog_response_is_quadratic, int analog_deadzone, float mouse_speed);
 void retroPostQuit();
 void retroReset(void);
+int retroTestGame(char *game_id,bool autodetect);
 
 void retroSetSystemDir(const char *aPath);
 void retroSetSaveDir(const char *aPath);

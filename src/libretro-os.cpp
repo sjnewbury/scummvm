@@ -31,8 +31,10 @@
 
 #include "audio/mixer_intern.h"
 #include "backends/base-backend.h"
+#include "base/commandLine.h"
 #include "common/config-manager.h"
 #include "common/events.h"
+#include "common/tokenizer.h"
 #include "surface.libretro.h"
 
 #if defined(_WIN32)
@@ -62,9 +64,10 @@
 #include <time.h>
 #endif
 
-#include "libretro.h"
 #include "features/features_cpu.h"
 #include "libretro-threads.h"
+#include "libretro.h"
+#include "os.h"
 
 extern retro_log_printf_t log_cb;
 
@@ -1125,6 +1128,79 @@ public:
     _events.push_back(ev);
   }
 
+  bool parseGameName(const Common::String &gameName, Common::String &engineId,
+                     Common::String &gameId) {
+    Common::StringTokenizer tokenizer(gameName, ":");
+    Common::String token1, token2;
+
+    if (!tokenizer.empty()) {
+      token1 = tokenizer.nextToken();
+    }
+
+    if (!tokenizer.empty()) {
+      token2 = tokenizer.nextToken();
+    }
+
+    if (!tokenizer.empty()) {
+      return false; // Stray colon
+    }
+
+    if (!token1.empty() && !token2.empty()) {
+      engineId = token1;
+      gameId = token2;
+      return true;
+    } else if (!token1.empty()) {
+      engineId.clear();
+      gameId = token1;
+      return true;
+    }
+
+    return false;
+  }
+
+  int TestGame(char *filedata, bool autodetect) {
+    Common::String game_id;
+    Common::String engine_id;
+    Common::String data = filedata;
+    int res = TEST_GAME_KO_NOT_FOUND;
+
+    PluginManager::instance().init();
+    PluginManager::instance().loadAllPlugins();
+    PluginManager::instance().loadDetectionPlugin();
+
+    if (autodetect) {
+      Common::FSNode dir(data);
+      Common::FSList files;
+      dir.getChildren(files, Common::FSNode::kListAll);
+
+      DetectionResults detectionResults = EngineMan.detectGames(files);
+      if (!detectionResults.listRecognizedGames().empty()) {
+        res = TEST_GAME_OK_ID_AUTODETECTED;
+      }
+
+    } else {
+
+      ConfMan.loadDefaultConfigFile();
+      if (ConfMan.hasGameDomain(data)) {
+        res = TEST_GAME_OK_TARGET_FOUND;
+      } else {
+        parseGameName(data, engine_id, game_id);
+
+        QualifiedGameList games = EngineMan.findGamesMatching(engine_id, game_id);
+        if (games.size() == 1) {
+          res = TEST_GAME_OK_ID_FOUND;
+        } else if (games.size() > 1) {
+          res = TEST_GAME_KO_MULTIPLE_RESULTS;
+        }
+      }
+    }
+
+    PluginManager::instance().unloadDetectionPlugin();
+    PluginManager::instance().unloadAllPlugins();
+    PluginManager::destroy();
+    return res;
+  }
+
   void postQuit() {
     Common::Event ev;
     ev.type = Common::EVENT_QUIT;
@@ -1146,6 +1222,8 @@ const Graphics::Surface &getScreen() { return dynamic_cast<OSystem_RETRO *>(g_sy
 void retroProcessMouse(retro_input_state_t aCallback, int device, float gamepad_cursor_speed, float gamepad_acceleration_time, bool analog_response_is_quadratic, int analog_deadzone, float mouse_speed) { dynamic_cast<OSystem_RETRO *>(g_system)->processMouse(aCallback, device, gamepad_cursor_speed, gamepad_acceleration_time, analog_response_is_quadratic, analog_deadzone, mouse_speed); }
 
 void retroPostQuit() { dynamic_cast<OSystem_RETRO *>(g_system)->postQuit(); }
+
+int retroTestGame(char *game_id, bool autodetect) {  return dynamic_cast<OSystem_RETRO *>(g_system)->TestGame(game_id, autodetect); }
 
 void retroSetSystemDir(const char *aPath) { s_systemDir = Common::String(aPath ? aPath : "."); }
 
