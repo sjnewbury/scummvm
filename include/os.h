@@ -60,7 +60,7 @@ OSystem *retroBuildOS(bool aEnableSpeedHack);
 const Graphics::Surface &getScreen();
 
 void retroProcessMouse(retro_input_state_t aCallback, int device, float gamepad_cursor_speed, float gamepad_acceleration_time, bool analog_response_is_quadratic, int analog_deadzone, float mouse_speed);
-void retroPostQuit();
+void retroQuit(void);
 void retroReset(void);
 int retroTestGame(char *game_id,bool autodetect);
 

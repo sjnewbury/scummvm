@@ -1201,7 +1201,7 @@ public:
     return res;
   }
 
-  void postQuit() {
+  void Quit() {
     Common::Event ev;
     ev.type = Common::EVENT_QUIT;
     dynamic_cast<OSystem_RETRO *>(g_system)->getEventManager()->pushEvent(ev);
@@ -1221,7 +1221,7 @@ const Graphics::Surface &getScreen() { return dynamic_cast<OSystem_RETRO *>(g_sy
 
 void retroProcessMouse(retro_input_state_t aCallback, int device, float gamepad_cursor_speed, float gamepad_acceleration_time, bool analog_response_is_quadratic, int analog_deadzone, float mouse_speed) { dynamic_cast<OSystem_RETRO *>(g_system)->processMouse(aCallback, device, gamepad_cursor_speed, gamepad_acceleration_time, analog_response_is_quadratic, analog_deadzone, mouse_speed); }
 
-void retroPostQuit() { dynamic_cast<OSystem_RETRO *>(g_system)->postQuit(); }
+void retroQuit() { dynamic_cast<OSystem_RETRO *>(g_system)->Quit(); }
 
 int retroTestGame(char *game_id, bool autodetect) {  return dynamic_cast<OSystem_RETRO *>(g_system)->TestGame(game_id, autodetect); }
 

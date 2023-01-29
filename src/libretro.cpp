@@ -435,7 +435,7 @@ void retro_unload_game(void) {
   if (!retro_emu_thread_initialized())
     return;
   while (!retro_emu_thread_exited()) {
-    retroPostQuit();
+    retroQuit();
     retro_switch_to_emu_thread();
   }
   retro_deinit_emu_thread();
