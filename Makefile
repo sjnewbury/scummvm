@@ -162,6 +162,7 @@ else ifeq ($(platform), wiiu)
    CP := cp
    STATIC_LINKING = 1
 
+# Nintendo 3DS
 else ifeq ($(platform), ctr)
    TARGET := $(TARGET_NAME)_libretro_$(platform).a
    CC = $(DEVKITARM)/bin/arm-none-eabi-gcc$(EXE_EXT)
@@ -180,7 +181,6 @@ else ifeq ($(platform), ctr)
    USE_THEORADEC = 0
    USE_TREMOR = 1
    HAVE_MT32EMU = 0
-   NO_HIGH_DEF := 1
    STATIC_LINKING = 1
 
 # Vita
