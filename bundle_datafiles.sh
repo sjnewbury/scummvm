@@ -40,25 +40,14 @@ function process_group(){
 }
 
 # Externally passed variables shall be:
-# $1 [REQ] BUILD_PATH
-# $2 [REQ] SCUMMVM_PATH
-# $3 [REQ] target build ("bundle" to build scummvm.zip, any other string to build core info file)
-# $4 [OPT] target name (prefix for core info file)
-# $5 [OPT] displayed core name (shown in frontend)
-# $6 [OPT] allowed extensions - backup if ScummVM.dat is not available
-
-# Exit if in parameters are not provided
-if [ -z $1 ] || [ -z $2 ] || [ -z $3 ] ; then
-	exit 1
-fi
-
-[ -z $4 ] && INFO_FILE_PRE=scummvm || INFO_FILE_PRE=$4
-[ -z $5 ] && NICE_NAME=ScummVM || NICE_NAME=$5
-[ -z $6 ] && ALLOWED_EXT=scummvm || ALLOWED_EXT=$6
+# $1 [REQ] target build ("bundle" to build scummvm.zip, any other string to build core info file)
+# $2 [OPT] target name (prefix for core info file)
+# $3 [OPT] displayed core name (shown in frontend)
+# $4 [OPT] allowed extensions - backup if ScummVM.dat is not available
 
 # Set variables
-BUILD_PATH="$1"
-SCUMMVM_PATH="$2"
+BUILD_PATH=$(pwd)
+SRC_PATH="${BUILD_PATH}/scummvm"
 TMP_PATH="${BUILD_PATH}/tmp_data"
 TARGET_PATH="${BUILD_PATH}"
 BUNDLE_DIR="scummvm"
@@ -68,8 +57,8 @@ BUNDLE_ZIP_FILE="${BUNDLE_DIR}.zip"
 BUNDLE_LOCAL_DATAFILES_DIR="${BUILD_PATH}/dist"
 
 # Retrieve data file info from ScummVM source
-THEMES_LIST=$(cat "${SCUMMVM_PATH}/dists/scummvm.rc" 2>/dev/null | grep FILE.*gui/themes.*\* | sed "s|.*\"\(.*\)\"|${SCUMMVM_PATH}/\1|g")
-DATAFILES_LIST=$(cat "${SCUMMVM_PATH}/dists/scummvm.rc" 2>/dev/null| grep FILE.*dists/engine-data | sed "s|.*\"\(.*\)\"|${SCUMMVM_PATH}/\1|g")
+THEMES_LIST=$(cat "${SRC_PATH}/dists/scummvm.rc" 2>/dev/null | grep FILE.*gui/themes.*\* | sed "s|.*\"\(.*\)\"|${SRC_PATH}/\1|g")
+DATAFILES_LIST=$(cat "${SRC_PATH}/dists/scummvm.rc" 2>/dev/null| grep FILE.*dists/engine-data | sed "s|.*\"\(.*\)\"|${SRC_PATH}/\1|g")
 
 # Put retrieved data into arrays
 set +e
@@ -78,45 +67,45 @@ read -a DATAFILES_ARRAY -d '' -r <<< "$DATAFILES_LIST"
 set -e
 
 # Add specific data files
-DATAFILES_ARRAY[${#DATAFILES_ARRAY[@]}]="${SCUMMVM_PATH}"/backends/vkeybd/packs/vkeybd_default.zip
+DATAFILES_ARRAY[${#DATAFILES_ARRAY[@]}]="${SRC_PATH}"/backends/vkeybd/packs/vkeybd_default.zip
 
 # Make sure target folders exist
-[ $3 = "bundle" ] && mkdir -p "${TMP_PATH}/${BUNDLE_THEME_DIR}/"
-[ $3 = "bundle" ] && mkdir -p "${TMP_PATH}/${BUNDLE_DATAFILES_DIR}/"
+[ $1 = "bundle" ] && mkdir -p "${TMP_PATH}/${BUNDLE_THEME_DIR}/"
+[ $1 = "bundle" ] && mkdir -p "${TMP_PATH}/${BUNDLE_DATAFILES_DIR}/"
 
 count=0
 # Process themes
-	process_group "$BUNDLE_THEME_DIR" $3 ${THEME_ARRAY[@]}
+	process_group "$BUNDLE_THEME_DIR" $1 ${THEME_ARRAY[@]}
 
 # Process datafiles
-	process_group "$BUNDLE_DATAFILES_DIR" $3 ${DATAFILES_ARRAY[@]}
+	process_group "$BUNDLE_DATAFILES_DIR" $1 ${DATAFILES_ARRAY[@]}
 
 # Process additional local bundle files
 if [ -d "$BUNDLE_LOCAL_DATAFILES_DIR" -a ! -z "$(ls -A ${BUNDLE_LOCAL_DATAFILES_DIR} 2>/dev/null)" ] ; then
 	for item in $BUNDLE_LOCAL_DATAFILES_DIR/*; do
 		[ ! $(echo "$item" | sed "s|^.*/||g") = "README.md" ] && LOCAL_EXTRA_ARRAY+=("$item")
 	done
-	process_group "$BUNDLE_DATAFILES_DIR" $3 ${LOCAL_EXTRA_ARRAY[@]}
+	process_group "$BUNDLE_DATAFILES_DIR" $1 ${LOCAL_EXTRA_ARRAY[@]}
 fi
 
-if [ ! $3 = "bundle" ]; then
+if [ ! $1 = "bundle" ]; then
 
-# Update from libretro ScummVM.dat
+# Updated manually
 wget -NO "$BUILD_PATH"/ScummVM.dat https://raw.githubusercontent.com/libretro/libretro-database/master/dat/ScummVM.dat
-[ -f "$BUILD_PATH"/ScummVM.dat ] && SUPPORTED_EXTENSIONS="$(cat $BUILD_PATH/ScummVM.dat | grep 'rom (' | sed 's/\" .*//g;s/.*\.//g' | sort -u | tr '\n' '|')" || SUPPORTED_EXTENSIONS="$ALLOWED_EXT"
+[ -f "$BUILD_PATH"/ScummVM.dat ] && SUPPORTED_EXTENSIONS="$(cat $BUILD_PATH/ScummVM.dat | grep 'rom (' | sed 's/\" .*//g;s/.*\.//g' | sort -u | tr '\n' '|')" || SUPPORTED_EXTENSIONS="$4"
 
 	# Create core.info file
 	set +e
 	read -d '' CORE_INFO_CONTENT <<EOF
 # Software Information
-display_name = "$NICE_NAME"
+display_name = "$3"
 authors = "SCUMMVMdev"
 supported_extensions = "$SUPPORTED_EXTENSIONS"
-corename = "$NICE_NAME"
+corename = "$3"
 categories = "Game"
 license = "GPLv3"
 permissions = ""
-display_version = $(cat $SCUMMVM_PATH/base/internal_version.h 2>/dev/null | grep SCUMMVM_VERSION | sed "s|^.*SCUMMVM_VERSION *||g")
+display_version = $(cat $SRC_PATH/base/internal_version.h 2>/dev/null | grep SCUMMVM_VERSION | sed "s|^.*SCUMMVM_VERSION *||g")
 
 # Hardware Information
 manufacturer = "Various"
@@ -147,8 +136,8 @@ EOF
 
 	CORE_INFO_CONTENT="${CORE_INFO_CONTENT}${CORE_INFO_DATS}
 description = \"The ScummVM adventure game engine ported to libretro. This core is built directly from the upstream repo and is synced upon stable releases, though it is not supported upstream. So please report any bug to Libretro and/or make sure the same apply to the standalone ScummVM program as well, before making any report to ScummVM Team.\""
-	echo "$CORE_INFO_CONTENT" > "${TARGET_PATH}/${INFO_FILE_PRE}_libretro.info"
-	echo "${INFO_FILE_PRE}_libretro.info created successfully"
+	echo "$CORE_INFO_CONTENT" > "${TARGET_PATH}/${2}_libretro.info"
+	echo "${2}_libretro.info created successfully"
 else
 
 	# Create archive

@@ -1,6 +1,5 @@
 build/libs/
 build/obj/
-deps/
 *.o
 *.a
 scummvm.zip
